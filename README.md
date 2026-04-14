@@ -1,7 +1,8 @@
 # Batch File Processor
 
-Java CLI tool for batch-processing customer CSV files — validates records,
-transforms data, reports errors, and archives the originals.
+Java CLI tool for batch-processing customer CSV files. Validates records,
+transforms the clean ones, writes separate output and error files, then
+archives the originals.
 
 ## Stack
 
@@ -21,22 +22,57 @@ java -jar target/batch-file-processor.jar \
 
 ## Input format
 
-CSV files with columns: `customer_id`, `full_name`, `email`, `signup_date`
+CSV files with these columns (header row required):
 
-## What it does
+| Column | Expected |
+|--------|----------|
+| `customer_id` | Positive integer |
+| `full_name` | 2–80 characters |
+| `email` | Must contain `@` and not end with it |
+| `signup_date` | ISO format — `YYYY-MM-DD` |
 
-- Validates each row (ID format, email structure, date format, name length)
-- Normalizes data (title case names, lowercase emails)
-- Writes clean records to a `.processed.csv` file
-- Writes failed rows to a `.errors.csv` file with reason
-- Archives the original after processing
+## What it produces
 
-## Options
+For each input file `customers.csv`:
+
+- `customers.csv.processed.csv` — clean, transformed records with a
+  `processed_at` timestamp added
+- `customers.csv.errors.csv` — rows that failed validation, with the row
+  number, field name, and error reason
+
+Transformations applied to valid rows: names are title-cased, emails are
+lowercased, whitespace is trimmed.
+
+## CLI options
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
 | `--input` | yes | — | Directory of CSV files to process |
 | `--output` | yes | — | Output directory |
-| `--archive` | yes | — | Archive directory for originals |
-| `--pattern` | no | `*` | File glob filter |
-| `--failOnError` | no | `false` | Exit non-zero if any rows fail |
+| `--archive` | yes | — | Where originals go after processing |
+| `--pattern` | no | `*` | Glob filter (e.g. `customer*.csv`) |
+| `--failOnError` | no | `false` | Exit code 4 if any rows fail validation |
+
+## Project structure
+
+```
+src/
+├── main/java/com/alex/batch/
+│   ├── App.java
+│   ├── cli/          # Arg parsing (Args record, ArgsParser)
+│   ├── config/       # AppConfig, ConfigLoader
+│   ├── io/           # CsvReader, CsvWriter, FileDiscoverer, ArchiveService
+│   ├── model/        # CustomerRecord, ProcessedCustomerRecord, ValidationError
+│   ├── processing/   # BatchProcessor, FileProcessor, RecordValidator, RecordTransformer
+│   └── util/         # ClockProvider, Metrics
+└── test/             # 22 tests across 5 test classes
+```
+
+## Tests
+
+```bash
+mvn test
+```
+
+22 tests covering the CSV reader, writer, record validator, transformer,
+and full file processing flow.
